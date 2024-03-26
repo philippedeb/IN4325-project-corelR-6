@@ -1,0 +1,5 @@
+# Ignore .DS_Store
+**/.DS_Store
+
+# Ignore miracl_index folder
+src/miracl_index/
