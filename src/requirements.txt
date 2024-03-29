@@ -1,0 +1,6 @@
+python-terrier
+datasets
+tqdm
+pandas
+jupyter
+ipywidgets
