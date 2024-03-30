@@ -49,3 +49,11 @@ get_100_bm25 = pt.BatchRetrieve(
     wmodel="BM25",
     num_results=100
 )
+
+TF_IDF =  pt.BatchRetrieve(index, controls = {"wmodel": "TF_IDF"})
+PL2 =  pt.BatchRetrieve(index, controls = {"wmodel": "PL2"})
+
+pipe = get_100_bm25 >> (TF_IDF ** PL2)
+
+pipe_fast = pipe.compile()
+(pipe_fast %2).search("kufuata ")
