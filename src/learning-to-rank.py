@@ -4,6 +4,7 @@ import datasets
 import pandas as pd
 from tqdm import tqdm
 from micracl_bm25 import *
+from sklearn.ensemble import RandomForestRegressor
 
 import nltk
 
@@ -44,6 +45,7 @@ with open(DATA_PROPERTIES, 'w') as f:
 # Load the index
 index = pt.IndexFactory.of(miracl_index_path)
 
+# Get the first 100 results using BM25
 get_100_bm25 = pt.BatchRetrieve(
     index,
     wmodel="BM25",
@@ -56,4 +58,11 @@ PL2 =  pt.BatchRetrieve(index, controls = {"wmodel": "PL2"})
 pipe = get_100_bm25 >> (TF_IDF ** PL2)
 
 pipe_fast = pipe.compile()
-(pipe_fast %2).search("kufuata ")
+
+fbr = pt.FeaturesBatchRetrieve(index, controls = {"wmodel": "BM25"}, features=["SAMPLE", "WMODEL:TF_IDF", "WMODEL:PL2"]) 
+
+BaselineLTR = fbr >> pt.pipelines.LTR_pipeline(RandomForestRegressor(n_estimators=400))
+BaselineLTR.fit(train_topics, qrels)
+
+results = pt.pipelines.Experiment([PL2, BaselineLTR], test_topics, qrels, ["map"], names=["PL2 Baseline", "LTR Baseline"])
+results
