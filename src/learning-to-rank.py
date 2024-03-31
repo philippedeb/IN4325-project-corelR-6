@@ -52,17 +52,9 @@ get_100_bm25 = pt.BatchRetrieve(
     num_results=100
 )
 
-TF_IDF =  pt.BatchRetrieve(index, controls = {"wmodel": "TF_IDF"})
-PL2 =  pt.BatchRetrieve(index, controls = {"wmodel": "PL2"})
+pipeline_with_features = ~get_100_bm25 >> (
+    pt.BatchRetrieve(index, wmodel="PL2") ** pt.BatchRetrieve(index, wmodel="DPH")
+)
 
-pipe = get_100_bm25 >> (TF_IDF ** PL2)
-
-pipe_fast = pipe.compile()
-
-fbr = pt.FeaturesBatchRetrieve(index, controls = {"wmodel": "BM25"}, features=["SAMPLE", "WMODEL:TF_IDF", "WMODEL:PL2"]) 
-
-BaselineLTR = fbr >> pt.pipelines.LTR_pipeline(RandomForestRegressor(n_estimators=400))
-BaselineLTR.fit(train_topics, qrels)
-
-results = pt.pipelines.Experiment([PL2, BaselineLTR], test_topics, qrels, ["map"], names=["PL2 Baseline", "LTR Baseline"])
-results
+test_queries = miracl_queries.get_topics()
+pipeline_with_features(test_queries)
