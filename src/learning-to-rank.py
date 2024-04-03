@@ -13,8 +13,19 @@ nltk.download("punkt")
 
 #TODO: load dataset in a way that is compatible with PyTerrier
 
-# Load miracl datasets from PyTerrier
-miracl_dataset = pt.get_dataset("irds:miracl")
+# Load miracl datasets
+lang = 'sw'  # choose language
+miracl_corpus_hf = datasets.load_dataset('miracl/miracl-corpus', lang, trust_remote_code=True)
+miracl_queries_hf = datasets.load_dataset('miracl/miracl', lang, trust_remote_code=True)
+
+# Convert Hugging Face datasets to PyTerrier dataset objects
+miracl_corpus_pt = pt.datasets(miracl_corpus_hf['train'], columns=["id", "text"])
+miracl_queries_pt = pt.dataset(miracl_queries_hf, columns=["id", "text"])
+
+# Access the datasets as required
+print(miracl_corpus_pt.get_corpus())
+print(miracl_queries_pt.get_topics())
+
 
 # Set up the folder to store the results
 LANGUAGES_FOLDER = os.path.join(DATA_FOLDER, 'languages')
