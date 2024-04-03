@@ -10,10 +10,11 @@ import nltk
 
 nltk.download("punkt")
 
-# Load miracl datasets
-lang='sw'   # choose language
-miracl_corpus = datasets.load_dataset('miracl/miracl-corpus', lang, trust_remote_code=True) # splits: train
-miracl_queries = datasets.load_dataset('miracl/miracl', lang, trust_remote_code=True)       # splits: train, dev, testA, testB
+
+#TODO: load dataset in a way that is compatible with PyTerrier
+
+# Load miracl datasets from PyTerrier
+miracl_dataset = pt.get_dataset("irds:miracl")
 
 # Set up the folder to store the results
 LANGUAGES_FOLDER = os.path.join(DATA_FOLDER, 'languages')
@@ -42,6 +43,8 @@ with open(DATA_PROPERTIES, 'w') as f:
 		else:
 			f.write(line)
 
+#TODO: implement first-stage retrieval
+
 # Load the index
 index = pt.IndexFactory.of(miracl_index_path)
 
@@ -51,6 +54,8 @@ get_100_bm25 = pt.BatchRetrieve(
     wmodel="BM25",
     num_results=100
 )
+
+#TODO: compute features
 
 TF_IDF =  pt.BatchRetrieve(index, controls = {"wmodel": "TF_IDF"})
 PL2 =  pt.BatchRetrieve(index, controls = {"wmodel": "PL2"})
@@ -66,3 +71,7 @@ BaselineLTR.fit(train_topics, qrels)
 
 results = pt.pipelines.Experiment([PL2, BaselineLTR], test_topics, qrels, ["map"], names=["PL2 Baseline", "LTR Baseline"])
 results
+
+#TODO: train learning to rank models
+
+
