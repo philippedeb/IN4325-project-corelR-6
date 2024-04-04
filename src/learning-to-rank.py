@@ -2,59 +2,49 @@
 import pyterrier as pt
 import datasets
 import pandas as pd
+import numpy as np
 from tqdm import tqdm
 from micracl_bm25 import *
 from sklearn.ensemble import RandomForestRegressor
 
-import nltk
 
-nltk.download("punkt")
+def get_dataframe_qrels(language: str, split: str = "dev") -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Get a dataframe containing the queries and qrels of a specific language.
 
-# Load miracl datasets
-lang='sw'   # choose language
-miracl_corpus = datasets.load_dataset('miracl/miracl-corpus', lang, trust_remote_code=True) # splits: train
-miracl_queries = datasets.load_dataset('miracl/miracl', lang, trust_remote_code=True)       # splits: train, dev, testA, testB
+    Args:
+        language (str): string representing the language of the dataset to load.
+        split (str): string representing the split of the dataset to load. Default is "dev".
 
-# Set up the folder to store the results
-LANGUAGES_FOLDER = os.path.join(DATA_FOLDER, 'languages')
-LANGUAGE_FOLDER = os.path.join(LANGUAGES_FOLDER, lang)
+    Returns:
+        DataFrame: a dataframe containing the qrels of a specific language.
+    """
+    assert language in queries, f"Language {language} not loaded"
+    assert split in queries[language], f"Split {split} not found for language {language}"
 
-INDICES_FOLDER = os.path.join(LANGUAGE_FOLDER, 'indices')
-INDEX_SPLIT_FOLDER = os.path.join(INDICES_FOLDER, "train")  # Only a "train" split is available, = everything
-miracl_index_path = os.path.join(INDEX_SPLIT_FOLDER, 'miracl_index')
+    # Preparing qrels for PyTerrier
+    qrels_pyt = []
 
-# If miracl_index does not exist, create it
-if not os.path.exists(miracl_index_path):
-	index_miracl_corpus(language)
+    for idx, data in enumerate(tqdm(queries[language][split], desc="Processing Qrels")):
+        for entry in data['positive_passages']:
+            qrels_pyt.append({'qid': data['query_id'],
+                        'docno': entry['docid'], 'label': 1})
+        for entry in data['negative_passages']:
+            qrels_pyt.append({'qid': data['query_id'],
+                        'docno': entry['docid'], 'label': 0})
 
-# Change the data.properties file to use in-memory data and indices
-DATA_PROPERTIES = os.path.join(miracl_index_path, 'data.properties')
+    qrels_df = pd.DataFrame(qrels_pyt)
 
-with open(DATA_PROPERTIES, 'r') as f:
-	lines = f.readlines()
-	
-with open(DATA_PROPERTIES, 'w') as f:
-	for line in lines:
-		if 'index.meta.data-source=file' in line:
-			f.write('index.meta.data-source=fileinmem\n')
-		elif 'index.meta.index-source=file' in line:
-			f.write('index.meta.index-source=fileinmem\n')
-		else:
-			f.write(line)
+    return qrels_df
 
-# Load the index
-index = pt.IndexFactory.of(miracl_index_path)
+lang='sw' # choose language
+load_data_language(lang)
+qrels = get_dataframe_queries_qrels(lang)
 
-# Get the first 100 results using BM25
-get_100_bm25 = pt.BatchRetrieve(
-    index,
-    wmodel="BM25",
-    num_results=100
-)
+print(qrels)
 
-pipeline_with_features = ~get_100_bm25 >> (
-    pt.BatchRetrieve(index, wmodel="PL2") ** pt.BatchRetrieve(index, wmodel="DPH")
-)
 
-test_queries = miracl_queries.get_topics()
-pipeline_with_features(test_queries)
+# if __name__ == '__main__':
+    # Get BM25 results for a specific language and split
+  #  load_data_language("sw")
+  #  get_bm25_results("sw", "testA")
