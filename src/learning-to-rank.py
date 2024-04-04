@@ -10,7 +10,7 @@ from sklearn.ensemble import RandomForestRegressor
 
 def get_dataframe_qrels(language: str, split: str = "dev") -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Get a dataframe containing the queries and qrels of a specific language.
+    Get a dataframe containing the qrels of a specific language.
 
     Args:
         language (str): string representing the language of the dataset to load.
@@ -37,11 +37,14 @@ def get_dataframe_qrels(language: str, split: str = "dev") -> Tuple[pd.DataFrame
 
     return qrels_df
 
+# Load files and index
+
 lang='sw' # choose language
 load_data_language(lang)
-qrels = get_dataframe_queries_qrels(lang)
 
-print(qrels)
+
+indexref = index_miracl_corpus(lang)
+qrels = get_dataframe_queries_qrels(lang)
 
 
 # if __name__ == '__main__':

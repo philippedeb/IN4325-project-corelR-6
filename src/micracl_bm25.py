@@ -105,6 +105,15 @@ def get_dataframe_queries_qrels(language: str, split: str = "dev") -> Tuple[pd.D
 
 
 def index_miracl_corpus(language: str):
+    """
+    Indexes the MIRACL corpus for a specified language.
+
+    Args:
+        language (str): The language for which the MIRACL corpus will be indexed.
+
+    Returns:
+        Indexed data obtained by indexing the MIRACL corpus for the specified language.
+    """
     assert language in corpora, f"Language {language} not loaded"
 
     # Set up the folder to store the indexed files
