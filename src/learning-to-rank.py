@@ -70,8 +70,15 @@ pipe = BM25 >> (TF_IDF ** PL2)
 
 fbr = pt.FeaturesBatchRetrieve(index, controls = {"wmodel": "BM25"}, features=["SAMPLE", "WMODEL:TF_IDF", "WMODEL:PL2"]) 
 
-BaselineLTR = fbr >> pt.pipelines.LTR_pipeline(RandomForestRegressor(n_estimators=400))
-BaselineLTR.fit(d, qrels)
+train_queries_path = os.path.join(DATA_FOLDER, LANGUAGES_FOLDER, language, BM25_FOLDER, "train", "queries.csv")
+train_queries_df = pd.read_csv(train_queries_path)
+
+#TODO: add a way to get training topics from data
+
+# Uses pt.ltr.apply_learned_model(), because this is the new way to do this
+# See: https://github.com/terrier-org/pyterrier/pull/432
+BaselineLTR = fbr >> pt.ltr.apply_learned_model(RandomForestRegressor(n_estimators=400))
+BaselineLTR.fit(train_queries_df, qrels)
 
 results = pt.pipelines.Experiment([PL2, BaselineLTR], test_topics, qrels, ["map"], names=["PL2 Baseline", "LTR Baseline"])
 results
