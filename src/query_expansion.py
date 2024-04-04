@@ -91,12 +91,16 @@ def get_dataframe_queries_qrels(language: str, split: str = "dev") -> Tuple[pd.D
     # Preparing queries and qrels for PyTerrier
     queries_pyt = []
     qrels_pyt = []
+    
     tokenize_docs(language)
-
+    # print("Without expansion")
+    
     for idx, data in enumerate(tqdm(queries[language][split], desc="Processing Queries and Qrels")):
-        new = word2vec(data['query'], language)
-        queries_pyt.append({'qid': data['query_id'], 'query': unidecode(new)})
+        expanded_query = word2vec(data['query'], language)
+        # queries_pyt.append({'qid': data['query_id'], 'query': unidecode(expanded_query)})
+        queries_pyt.append({'qid': data['query_id'], 'query': expanded_query})
         # queries_pyt.append({'qid': data['query_id'], 'query': unidecode(data['query'])})
+        # queries_pyt.append({'qid': data['query_id'], 'query': data['query']})
         # queries_pyt.append({'qid': data['query_id'], 'query': expand_query(unidecode(data['query']))})
         for entry in data['positive_passages']:
             qrels_pyt.append({'qid': data['query_id'],
@@ -125,15 +129,18 @@ def preprocess(text):
     return text.translate(str.maketrans('', '', string.punctuation))
 
 def tokenize_docs(language):
-    rand_ind = [random.randint(0, len(corpora[language]["train"]) - 1) for _ in range(130)]
+    fraction = 0.0001
+    corpora_length = len(corpora[language]["train"])
+    print(f"Tokenizing {int(corpora_length*fraction)} documents")
+    rand_ind = [random.randint(0, corpora_length - 1) for _ in range(int(corpora_length * fraction))]
     for i in rand_ind:
-    # for i in range(130):
+    # for i in range(int(corpora_length * fraction)):
         processed_docs.extend([word_tokenize(preprocess(corpora[language]["train"][i]["text"]))])
 
-def word2vec(query, language, num_repeats=5):
+def word2vec(query, language):
     tokenized_queries = word_tokenize(preprocess(query))
     all_sentences = tokenized_queries + processed_docs
-    model = Word2Vec(sentences=all_sentences, vector_size=500, window=10, min_count=10, workers=4)
+    model = Word2Vec(sentences=all_sentences, vector_size=300, window=10, min_count=10, workers=4)
     exp_query = list(tokenized_queries)
     stop_word = stop_words.get(language, set())
 
@@ -171,21 +178,27 @@ def index_miracl_corpus(language: str):
     miracl_index_path = os.path.join(SPLIT_FOLDER, 'miracl_index')
 
     if language == "de":
-        indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True, stemmer="SpanishSnowballStemmer", stopwords=None, tokeniser="UTFTokeniser")
+        print("German indexer")
+        indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True, stemmer="GermanSnowballStemmer", stopwords=None, tokeniser="UTFTokeniser")
         return indexer.index(get_corpus_iter(language))
     elif language == "fr":
+        print("French indexer")
         indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True, stemmer="FrenchSnowballStemmer", stopwords=None, tokeniser="UTFTokeniser")
         return indexer.index(get_corpus_iter(language))
     elif language == "fi":
+        print("Finnish indexer")
         indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True, stemmer="FinnishSnowballStemmer", stopwords=None, tokeniser="UTFTokeniser")
         return indexer.index(get_corpus_iter(language))
     elif language == "es":
+        print("Spanish indexer")
         indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True, stemmer="SpanishSnowballStemmer", stopwords=None, tokeniser="UTFTokeniser")
         return indexer.index(get_corpus_iter(language))
     elif language == "en":
+        print("English indexer")
         indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True)
         return indexer.index(get_corpus_iter(language))
     else:
+        print("Standard indexer")
         indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True, stopwords=None, tokeniser="UTFTokeniser")
         return indexer.index(get_corpus_iter(language))
 
@@ -268,7 +281,6 @@ def get_bm25_results(language: str, split: str = "dev"):
     # results = BM25.transform(queries_df)
 
     eval_metrics = ['map', 'ndcg']
-    # eval_metrics = ['map']
     eval_results = pt.Experiment(
         [BM25],
         queries_df,
@@ -318,6 +330,6 @@ if __name__ == '__main__':
     
     # Get BM25 results for a specific language and split
     
-    language = "fi"
+    language = "es"
     load_data_language(language)
-    get_bm25_results(language, "dev")
+    # get_bm25_results(language, "dev")
