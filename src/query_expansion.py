@@ -4,15 +4,35 @@ from tqdm import tqdm
 import datasets
 import os
 import json
+import time
 from typing import Tuple
+from unidecode import unidecode
+from gensim.models import Word2Vec
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+import nltk
+import string
+# import numpy as np
+import random
+
+nltk.download('punkt')
 
 DATA_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
 
 if not pt.started():
-    pt.init(boot_packages=["com.github.terrierteam:terrier-prf:-SNAPSHOT"])
+    # pt.init(boot_packages=["com.github.terrierteam:terrier-prf:-SNAPSHOT"])
+    pt.init()
     
 corpora = {}
 queries = {}
+processed_docs = []
+stop_words = {
+    'fr': set(stopwords.words('french')),
+    'fi': set(stopwords.words('finnish')),
+    'de': set(stopwords.words('german')),
+    'en': set(stopwords.words('english')),
+    'es': set(stopwords.words('spanish')),
+}
     
 def load_data_language(language: str) -> None:
     miracl_corpus = datasets.load_dataset('miracl/miracl-corpus', language, trust_remote_code=True)
@@ -71,16 +91,19 @@ def get_dataframe_queries_qrels(language: str, split: str = "dev") -> Tuple[pd.D
     # Preparing queries and qrels for PyTerrier
     queries_pyt = []
     qrels_pyt = []
+    tokenize_docs(language)
 
     for idx, data in enumerate(tqdm(queries[language][split], desc="Processing Queries and Qrels")):
-        queries_pyt.append({'qid': data['query_id'], 'query': data['query']})
+        new = word2vec(data['query'], language)
+        queries_pyt.append({'qid': data['query_id'], 'query': unidecode(new)})
+        # queries_pyt.append({'qid': data['query_id'], 'query': unidecode(data['query'])})
+        # queries_pyt.append({'qid': data['query_id'], 'query': expand_query(unidecode(data['query']))})
         for entry in data['positive_passages']:
             qrels_pyt.append({'qid': data['query_id'],
                         'docno': entry['docid'], 'label': 1})
         for entry in data['negative_passages']:
             qrels_pyt.append({'qid': data['query_id'],
                         'docno': entry['docid'], 'label': 0})
-
 
     queries_df = pd.DataFrame(queries_pyt)
     queries_df['query'] = queries_df['query'].str.replace('?', '')  # remove question marks
@@ -90,14 +113,44 @@ def get_dataframe_queries_qrels(language: str, split: str = "dev") -> Tuple[pd.D
     queries_df['query'] = queries_df['query'].str.replace("!", "")  # remove exclamation mark
     queries_df['query'] = queries_df['query'].str.replace("¡", "")  # 
     queries_df['query'] = queries_df['query'].str.replace("¿", "")  # 
+    # queries_df['query'] = queries_df['query'].str.replace(".", "")  # 
     # queries_df['query'] = queries_df['query'].str.replace(",", "")  # 
     # queries_df['query'] = queries_df['query'].str.replace("^", "")  # 
-
 
     qrels_df = pd.DataFrame(qrels_pyt)
 
     return queries_df, qrels_df
 
+def preprocess(text):
+    return text.translate(str.maketrans('', '', string.punctuation))
+
+def tokenize_docs(language):
+    rand_ind = [random.randint(0, len(corpora[language]["train"]) - 1) for _ in range(130)]
+    for i in rand_ind:
+    # for i in range(130):
+        processed_docs.extend([word_tokenize(preprocess(corpora[language]["train"][i]["text"]))])
+
+def word2vec(query, language, num_repeats=5):
+    tokenized_queries = word_tokenize(preprocess(query))
+    all_sentences = tokenized_queries + processed_docs
+    model = Word2Vec(sentences=all_sentences, vector_size=500, window=10, min_count=10, workers=4)
+    exp_query = list(tokenized_queries)
+    stop_word = stop_words.get(language, set())
+
+    for word in tokenized_queries:
+        if word in stop_word:
+            continue
+        
+        if word in model.wv:
+            similar_words = model.wv.most_similar(word)
+            for key, value in similar_words:
+                if key in stop_word:
+                    continue
+                if value >= 0.8:
+                    exp_query.append(key)
+                    break
+    
+    return ' '.join(exp_query)
 
 def index_miracl_corpus(language: str):
     assert language in corpora, f"Language {language} not loaded"
@@ -117,8 +170,24 @@ def index_miracl_corpus(language: str):
         os.makedirs(SPLIT_FOLDER)
     miracl_index_path = os.path.join(SPLIT_FOLDER, 'miracl_index')
 
-    indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True)
-    return indexer.index(get_corpus_iter(language))
+    if language == "de":
+        indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True, stemmer="SpanishSnowballStemmer", stopwords=None, tokeniser="UTFTokeniser")
+        return indexer.index(get_corpus_iter(language))
+    elif language == "fr":
+        indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True, stemmer="FrenchSnowballStemmer", stopwords=None, tokeniser="UTFTokeniser")
+        return indexer.index(get_corpus_iter(language))
+    elif language == "fi":
+        indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True, stemmer="FinnishSnowballStemmer", stopwords=None, tokeniser="UTFTokeniser")
+        return indexer.index(get_corpus_iter(language))
+    elif language == "es":
+        indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True, stemmer="SpanishSnowballStemmer", stopwords=None, tokeniser="UTFTokeniser")
+        return indexer.index(get_corpus_iter(language))
+    elif language == "en":
+        indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True)
+        return indexer.index(get_corpus_iter(language))
+    else:
+        indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True, stopwords=None, tokeniser="UTFTokeniser")
+        return indexer.index(get_corpus_iter(language))
 
 
 def get_bm25_results(language: str, split: str = "dev"):
@@ -180,34 +249,39 @@ def get_bm25_results(language: str, split: str = "dev"):
     print(f"Loaded queries and qrels for {language} ({split})")
     
     # Define the BM25 retrieval model
-    bo1 = pt.rewrite.Bo1QueryExpansion(index)
-    kl = pt.rewrite.KLQueryExpansion(index)
-    rm3 = pt.rewrite.RM3(index)
-    axiomatic = pt.rewrite.AxiomaticQE(index)
+    # bo1 = pt.rewrite.Bo1QueryExpansion(index)
+    # kl = pt.rewrite.KLQueryExpansion(index)
+    # rm3 = pt.rewrite.RM3(index)
+    # sd =  pt.rewrite.SequentialDependence(index)
+    # axiomatic = pt.rewrite.AxiomaticQE(index)
     
+    # tfidf_vectorizer = TfidfVectorizer()
+    # lsa_model = TruncatedSVD(n_components=10)
     BM25 = pt.BatchRetrieve(index, wmodel="BM25")
-    qe_bo1 = BM25 >> bo1 >> BM25
-    qe_kl = BM25 >> kl >> BM25
-    qe_rm3 = BM25 >> rm3 >> BM25
-    qe_ax = BM25 >> axiomatic >> BM25
+    # qe_bo1 = BM25 >> bo1 >> BM25
+    # qe_kl = BM25 >> kl >> BM25
+    # qe_rm3 = BM25 >> rm3 >> BM25
+    # qe_sd = BM25 >> sd >> BM25
+    # qe_ax = BM25 >> axiomatic >> BM25
 
     # Retrieve the results
     # results = BM25.transform(queries_df)
 
     eval_metrics = ['map', 'ndcg']
+    # eval_metrics = ['map']
     eval_results = pt.Experiment(
-        [BM25, qe_bo1, qe_kl, qe_rm3, qe_ax],
+        [BM25],
         queries_df,
         qrels_df,
         eval_metrics=eval_metrics,
-        names=["BM25", "Bo1", "KL", "RM3", "Axiomatic"]
+        names=["BM25"]
     )
 
     print(f"Evaluated BM25 for {language} ({split})")
     print(eval_results)
 
     # Write the results to a file
-    eval_results.to_csv(os.path.join(BM25_SPLIT_FOLDER, 'results.csv'))
+    eval_results.to_csv(os.path.join(BM25_SPLIT_FOLDER, time.strftime("%Y%m%d-%H%M%S") + '_results.csv'))
 
     return eval_results
 
@@ -243,5 +317,7 @@ if __name__ == '__main__':
     # get_all_bm25_results()
     
     # Get BM25 results for a specific language and split
-    load_data_language("yo")
-    get_bm25_results("yo", "dev")
+    
+    language = "fi"
+    load_data_language(language)
+    get_bm25_results(language, "dev")
