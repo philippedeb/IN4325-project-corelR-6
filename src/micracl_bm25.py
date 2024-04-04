@@ -152,7 +152,7 @@ def get_bm25_results(language: str, split: str = "dev"):
         os.makedirs(BM25_SPLIT_FOLDER)
 
     INDICES_FOLDER = os.path.join(LANGUAGE_FOLDER, 'indices')
-    INDEX_SPLIT_FOLDER = os.path.join(INDICES_FOLDER, "train")  # Only a "train" split is available, = everything
+    INDEX_SPLIT_FOLDER = os.path.join(INDICES_FOLDER, "train")
     miracl_index_path = os.path.join(INDEX_SPLIT_FOLDER, 'miracl_index')
 
     # If miracl_index does not exist, create it
@@ -171,6 +171,10 @@ def get_bm25_results(language: str, split: str = "dev"):
                 f.write('index.meta.index-source=fileinmem\n')
             else:
                 f.write(line)
+
+
+def get_bm25_results(language: str, split: str = "dev"):
+    setup_bm25_folders(language, split)
 
     # Load the index
     index = pt.IndexFactory.of(miracl_index_path)

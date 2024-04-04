@@ -39,13 +39,37 @@ def get_dataframe_qrels(language: str, split: str = "dev") -> Tuple[pd.DataFrame
 
 # Load files and index
 
-lang='sw' # choose language
-load_data_language(lang)
+language='sw' # Choose language
+split = 'dev' # Set split
+load_data_language(language)
 
+# Load the index
+LANGUAGES_FOLDER = os.path.join(DATA_FOLDER, 'languages')
+LANGUAGE_FOLDER = os.path.join(LANGUAGES_FOLDER, language)
+BM25_FOLDER = os.path.join(LANGUAGE_FOLDER, 'bm25')
+INDICES_FOLDER = os.path.join(LANGUAGE_FOLDER, 'indices')
+INDEX_SPLIT_FOLDER = os.path.join(INDICES_FOLDER, "train")
+miracl_index_path = os.path.join(INDEX_SPLIT_FOLDER, 'miracl_index')
+index = pt.IndexFactory.of(miracl_index_path)
 
-indexref = index_miracl_corpus(lang)
-qrels = get_dataframe_queries_qrels(lang)
+# Load the qrels
+qrels = get_dataframe_qrels(language)
 
+# Multi-stage retrieval
+
+#this ranker will make the candidate set of documents for each query
+BM25 = pt.BatchRetrieve(index, controls = {"wmodel": "BM25"}, num_results = 100)
+
+#these rankers we will use to re-rank the BM25 results
+TF_IDF =  pt.BatchRetrieve(index, controls = {"wmodel": "TF_IDF"})
+PL2 =  pt.BatchRetrieve(index, controls = {"wmodel": "PL2"})
+
+pipe = BM25 >> (TF_IDF ** PL2) 
+
+test_queries_path = os.path.join(DATA_FOLDER, LANGUAGES_FOLDER, language, BM25_FOLDER, "testA", "queries.csv")
+test_queries_df = pd.read_csv(test_queries_path)
+# pipe(test_queries_df)
+pipe.transform(test_queries_df)
 
 # if __name__ == '__main__':
     # Get BM25 results for a specific language and split
