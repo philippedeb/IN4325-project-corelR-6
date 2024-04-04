@@ -134,12 +134,16 @@ def index_miracl_corpus(language: str):
     indexer = pt.IterDictIndexer(miracl_index_path, overwrite=True, blocks=True)
     return indexer.index(get_corpus_iter(language))
 
+def setup_bm25_folders(language: str, split: str):
+    """
+    Set up the folder structure to store BM25 results.
 
-def get_bm25_results(language: str, split: str = "dev"):
+    Args:
+        language (str): The language for which the BM25 results will be stored.
+        split (str): The split of the dataset for which BM25 results will be stored. Default is "dev".
+    """
     assert language in corpora, f"Language {language} not loaded"
-    assert split in queries[language], f"Split {split} not found for language {language}"
 
-    # Set up the folder to store the results
     LANGUAGES_FOLDER = os.path.join(DATA_FOLDER, 'languages')
     LANGUAGE_FOLDER = os.path.join(LANGUAGES_FOLDER, language)
 
