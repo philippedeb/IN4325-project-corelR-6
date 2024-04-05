@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from matplotlib.font_manager import FontProperties
+import yaml
 
 prop = FontProperties()
 
@@ -418,6 +419,96 @@ def get_latex_corpora_stats():
     print("\\end{tabularx}")
 
 
+def get_latex_queries_stats(split: str = "total"):
+    """
+    For all files in the queries stats folder, which follow the following structure (example):
+        {
+            "language": "en",
+            "train": {
+                "split": "train",
+                "queries": 2863,
+                "mean_query_length": 39.07125473022461,
+                "min_query_length": 11,
+                "max_query_length": 129
+            },
+            "dev": {
+                "split": "dev",
+                "queries": 799,
+                "mean_query_length": 40.24781036376953,
+                "min_query_length": 16,
+                "max_query_length": 122
+            },
+            "testA": {
+                "split": "testA",
+                "queries": 734,
+                "mean_query_length": 40.48773956298828,
+                "min_query_length": 16,
+                "max_query_length": 108
+            },
+            "testB": {
+                "split": "testB",
+                "queries": 1790,
+                "mean_query_length": 49.61843490600586,
+                "min_query_length": 13,
+                "max_query_length": 165
+            },
+            "total": {
+                "split": "total",
+                "queries": 6186,
+                "mean_query_length": 42.443260192871094,
+                "min_query_length": 11,
+                "max_query_length": 165
+            }
+        }
+
+    We want to print a LaTex table with the following structure:
+    (Note: any float value should be rounded to 1 decimal place)
+
+    Code | Language | no. of queries | avg query length | min query length max query length    
+    ar
+    bn
+    de
+    ...
+
+    The splits can be train, dev, testA, testB, total. Note, that not all languages have all splits.
+    This function prints the tabularx LaTeX code such that it can easily be copied into a LaTeX document.
+
+    Make a table for each split based on the data in the queries stats folder.
+
+    """
+    print("\\begin{tabularx}{\\textwidth}{|l|*{5}{X|}}")
+    print("\\hline")
+    print(r"Code & Language & No. of queries & Avg. query length & Min. query length & Max. query length \\ \hline")
+    rows = []
+    for filename in os.listdir(QUERIES_FOLDER):
+        if not filename.endswith(".json"):
+            continue
+        data = json.load(open(os.path.join(QUERIES_FOLDER, filename)))
+        language = data["language"].strip()
+        full_language = [y for x, y in languages_lib if x ==
+                         language][0].capitalize()
+        if split not in data:
+            continue
+        queries = data[split]["queries"]
+        avg_query_length = round(data[split]["mean_query_length"], 1)
+        min_query_length = data[split]["min_query_length"]
+        max_query_length = data[split]["max_query_length"]
+
+        # Convert numeric string to include dots . for each thousand and for decimals use a comma ,
+        # Example: 1000000.3 -> 1.000.000,3
+        # Example 2: 17 -> 17
+        queries = f"{queries:,}".replace(",", ".")
+        max_query_length = f"{max_query_length:,}".replace(",", ".")
+        avg_query_length = str(avg_query_length).replace(".", ",")
+        rows.append(
+            f"{language} & {full_language} & {queries} & {avg_query_length} & {min_query_length} & {max_query_length} \\\\")
+    rows.sort()
+    for row in rows:
+        print(row)
+    print("\\hline")
+    print("\\end{tabularx}")
+
+
 def language_distribution_plot():
     # Define the data
     data = {
@@ -518,5 +609,153 @@ def language_distribution_plot2():
     plt.show()
 
 
+def query_distribution_plot():
+    data = {
+        'Code': ['ar', 'bn', 'de', 'en', 'es', 'fa', 'fi', 'fr', 'hi', 'id', 'ja', 'ko', 'ru', 'sw', 'te', 'th', 'yo', 'zh'],
+        'Language': ['Arabic', 'Bengali', 'German', 'English', 'Spanish', 'Persian', 'Finnish', 'French', 'Hindi', 'Indonesian', 'Japanese', 'Korean', 'Russian', 'Swahili', 'Telugu', 'Thai', 'Yoruba', 'Chinese'],
+        'No. of queries': [8732, 3274, 1017, 6186, 4325, 4215, 5939, 2287, 2338, 6373, 6128, 2761, 7564, 3486, 5667, 5347, 407, 2625],
+        'Avg. query length': [29.9, 45.1, 44.9, 42.4, 47.1, 40.8, 37.7, 43.9, 52.5, 36.9, 17.3, 19.7, 43.5, 39.8, 37.7, 41.6, 37.5, 11.0],
+        'Min. query length': [11, 15, 12, 11, 15, 15, 13, 14, 19, 12, 5, 4, 14, 12, 12, 11, 19, 6],
+        'Max. query length': [101, 132, 95, 165, 92, 116, 149, 103, 120, 128, 57, 142, 184, 101, 119, 185, 69, 28]
+    }
+
+    # Convert data to DataFrame
+    df = pd.DataFrame(data)
+
+    # Sort DataFrame by 'Avg. query length' in descending order
+    df = df.sort_values(by='Avg. query length', ascending=True)
+
+    # Set the style of seaborn
+    sns.set_theme(style="whitegrid")
+
+    # Create subplots
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(18, 6))
+
+    # Plot average query length
+    sns.barplot(ax=axes[0], data=df, x='Avg. query length',
+                y='Language', palette='viridis')
+    axes[0].set_title('Average Query Length', fontsize=20)
+    axes[0].set_xticks(np.arange(0, 61, 5))
+
+    # Plot minimum query length
+    sns.barplot(ax=axes[1], data=df, x='Min. query length',
+                y='Language', palette='viridis')
+    axes[1].set_title('Minimum Query Length', fontsize=20)
+
+    # Set min query length x ticks to more frequent ticks
+    axes[1].set_xticks(np.arange(0, 22, 2))
+
+    # Plot maximum query length
+    sns.barplot(ax=axes[2], data=df, x='Max. query length',
+                y='Language', palette='viridis')
+    axes[2].set_title('Maximum Query Length', fontsize=20)
+    axes[2].set_xticks(np.arange(0, 201, 25))
+
+    # Set fontsize x labels and y labels
+    for ax in axes:
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+        ax.tick_params(axis='x', labelsize=16)
+        ax.tick_params(axis='y', labelsize=16)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def get_latex_mdpr_table():
+    """
+    Get the LaTeX code for the table of the mDPR results.
+    Meaning, the name contains "mdpr".
+
+    The YAML file is structured as follows (two examples):
+
+    conditions:
+        - name: bm25-mdpr-tied-pft-msmarco-hybrid.ja
+            eval_key: miracl-v1.0-ja
+            command: python -m pyserini.fusion --runs ${bm25_output} ${mdpr_output} --output ${output} --method interpolation --alpha 0.5 --depth 1000 --k 1000
+            splits:
+            - split: train
+                scores:
+                - nDCG@10: 0.5795
+                    R@100: 0.9082
+            - split: dev
+                scores:
+                - nDCG@10: 0.5757
+                    R@100: 0.9036
+        - name: bm25-mdpr-tied-pft-msmarco-hybrid.ko
+            eval_key: miracl-v1.0-ko
+            command: python -m pyserini.fusion --runs ${bm25_output} ${mdpr_output} --output ${output} --method interpolation --alpha 0.5 --depth 1000 --k 1000
+            splits:
+            - split: train
+                scores:
+                - nDCG@10: 0.5758
+                    R@100: 0.8744
+            - split: dev
+                scores:
+                - nDCG@10: 0.6086
+                    R@100: 0.8997
+
+    The language codes are the same as in the previous functions.
+    They can be found in the "name", splitting on . and taking the last element.
+
+    Get all the results for the "train" and "dev" splits for mDPR and print them in a LaTeX table.
+    Note: the languages should be sorted alphabetically.
+
+    The final table should look like
+
+    Model    Metric     Split                        Languages
+                                 ar       bn      de ...
+
+              nDCG@10   Train    [score] [score] [score] ...
+    mdpr..              Dev
+              R@100     Train
+                        Dev
+
+    """
+    results_file = os.path.join(STATS_FOLDER, 'results_bm25_mdpr.yaml')
+    results = yaml.load(open(results_file), Loader=yaml.FullLoader)
+
+    parsed_data = results
+
+    # Extract relevant information and organize into a dictionary
+    results = {}
+    for entry in parsed_data['conditions']:
+        model = entry['name'].split('.')[0]
+        language = entry['name'].split('.')[-1]
+        for split in entry['splits']:
+            split_name = split['split']
+            for score in split['scores']:
+                metric = list(score.keys())[0]
+                value = score[metric]
+                if 'mdpr' in model:
+                    key = (model, metric, split_name)
+                    if key not in results:
+                        results[key] = {}
+                    results[key][language] = value
+
+    # Sort languages alphabetically for each model
+    for key in results:
+        results[key] = dict(sorted(results[key].items()))
+
+    # Print LaTeX table
+    print("\\begin{table}[H]")
+    print("\centering")
+    print("\\begin{tabular}{|c|c|c|c|c|c|}")
+    print("\hline")
+    print("Model & Metric & Split & Languages \\\\")
+    print("\hline")
+    for key, value in results.items():
+        model, metric, split = key
+        languages = " & ".join([f"{lang} [{value[lang]}]" for lang in value])
+        print(f"{model} & {metric} & {split} & {languages} \\\\")
+        if metric == 'nDCG@10' and split == 'Dev':
+            print("\\hline")
+    print("\hline")
+    print("\end{tabular}")
+    print("\caption{Your caption here}")
+    print("\label{tab:yourlabel}")
+    print("\end{table}")
+
+
 if __name__ == "__main__":
-    language_distribution_plot2()
+    get_latex_mdpr_table()
